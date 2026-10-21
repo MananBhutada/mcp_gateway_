@@ -1,48 +1,63 @@
-# Live store and chat acceptance checks
+# Live acceptance tests
 
-These checks complement unit tests. They do not replace a real browser checkout or a Kubernetes persistence test.
+These checks are intended for a disposable local cluster. They complement unit tests; they do not replace a real browser checkout or prove production readiness. Never put credentials into command history, logs, screenshots or Git.
 
-## 1. WooCommerce REST smoke test
+## 1. Helm rendering
 
-Use a dedicated disposable store or local cluster. Create a WooCommerce REST API key with only the required permissions, and do not commit it.
+```powershell
+helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
+helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
+helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
+helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
+```
 
-PowerShell example:
+Review rendered Secret references, PVCs, Ingress, resource settings and NetworkPolicies. Rendering is not the same as a successful installation.
 
-\`\`\`powershell
-$env:WOO_BASE_URL = "https://store.example.com"
-$env:WOO_CONSUMER_KEY = "ck_replace_me"
-$env:WOO_CONSUMER_SECRET = "cs_replace_me"
+## 2. Live Kubernetes state
+
+```powershell
+kubectl get pods -o wide
+kubectl get jobs
+kubectl get pvc
+kubectl get services
+kubectl get ingress
+```
+
+Expected: application pods Ready, WordPress setup Job complete, and MySQL/PostgreSQL/WordPress PVCs Bound. Inspect events and logs before retrying a failed Job.
+
+## 3. Store and persistence
+
+1. Open the configured storefront hostname and confirm a published test product.
+2. Complete a test-only COD checkout.
+3. Verify order number, line items, total, payment method and status in wp-admin.
+4. Record a product/order ID.
+5. Restart WordPress and MySQL pods only; do not delete PVCs.
+6. Verify the same product/order remains.
+
+Mark this gate complete only after the browser and post-restart checks have actually passed.
+
+## 4. WooCommerce REST smoke test
+
+Use a disposable store and least-privilege REST key. Set `WOO_BASE_URL`, `WOO_CONSUMER_KEY`, and `WOO_CONSUMER_SECRET` in the local shell without echoing or committing them, then run:
+
+```powershell
 python scripts/smoke_test_woocommerce.py
-\`\`\`
+```
 
-For a disposable local-only cluster using HTTP, explicitly opt in:
+For a local HTTP cluster only, use the explicit insecure-HTTP opt-in supported by the script. The smoke test should use a disposable draft product; remove it manually after testing. Never use production customer/order data.
 
-\`\`\`powershell
-$env:WOO_BASE_URL = "http://store.urumi.local"
-$env:WOO_ALLOW_INSECURE_HTTP = "1"
-python scripts/smoke_test_woocommerce.py
-\`\`\`
+## 5. MCP gateway
 
-The script reads products, creates a disposable **draft** product, reads it back, and lists orders. Set \`WOO_TEST_ORDER_ID\` to an existing test order to verify order lookup and a same-status update. It never prints credentials or raw upstream bodies. Delete the disposable draft product manually when finished.
+Connect MCP Inspector or an SDK client to the single gateway `/mcp` endpoint with a disposable member key. Verify initialize, `tools/list`, and a harmless `tools/call`. Confirm WooCommerce, Weather and Currency tools are namespaced and that the call is audited. Revoke the key and verify the next call is rejected.
 
-Important: the Woo MCP client signs WooCommerce REST requests with OAuth 1.0a. For local HTTP clusters, it sends the request to the in-cluster WordPress service while signing the canonical store host URL. Keep the service private, redact query strings in logs, and use a least-privilege key.
+## 6. Authorization, audit and isolation
 
-## 2. Browser checkout acceptance
+- Verify member key receives 403 on admin-only API routes.
+- Deny a specific tool for MEMBER; verify it is hidden from the member's tool list and rejected on direct call.
+- Verify audit events contain user, server, tool, duration and outcome for success and failure.
+- Disable an upstream and verify its tools disappear; try a stale call.
+- In a disposable cluster, stop one upstream and confirm other upstreams remain usable.
 
-1. Open the configured storefront host.
-2. Verify the Sample Tee or another published test product is visible.
-3. Add it to cart and proceed to checkout.
-4. Use test-only customer details and Cash on Delivery.
-5. Place the order and record the order number/status.
-6. Sign into WordPress Admin and verify that order, line items, total and payment method.
-7. Restart the WordPress and MySQL pods; verify the product and order still exist.
+## 7. Dashboard and chat
 
-Do not mark checkout or persistence complete until each step has been performed against the running cluster.
-
-## 3. Gateway MCP acceptance
-
-Connect MCP Inspector or Cursor to the single gateway MCP endpoint using a member API key. Verify initialize, tools/list and tools/call. Confirm WooCommerce tools are namespaced and all calls are audited. Revoke the key and retry: the next call must be rejected. Disable the WooCommerce upstream and refresh tools/list: its tools must disappear and stale calls must fail. Stop the WooCommerce MCP pod and confirm Weather/Currency remain usable.
-
-## 4. Dashboard chat acceptance
-
-The chat API only accepts user/assistant conversation turns, limits the request size, uses server-owned tool schemas, and routes tool calls through the gateway router. Verify a prompt that requires two upstream tools, inspect the tool trace, and confirm the audit records attribute the calls to the logged-in user. If the configured Anthropic key is absent, the chat endpoint should return a safe configuration error rather than pretend the model is running.
+Sign in using a Urumi Gateway API key, not the LLM provider key. Chat additionally requires a configured provider key. Verify a tool-calling prompt uses gateway routing and audit attribution. If the provider key is absent, a clear configuration error is expected; do not present a mocked answer as a live model result.
