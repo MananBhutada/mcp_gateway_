@@ -71,7 +71,7 @@ This note describes the threats visible in the current source and Helm templates
 
 ## Known limitations
 
-- `infrastructure/helm/urumi/values-local.yaml` contains disposable demo credentials and an empty `llmApiKey`; do not reuse it in production.
+- `infrastructure/helm/urumi/values-local.yaml` contains disposable demo credentials and an empty `secrets.llmApiKey`; do not reuse it in production.
 - The chart uses Kubernetes Secret objects but does not configure etcd encryption at rest or an external secret manager.
 - `services/gateway/app/routing/router.py` keeps `TOOL_CACHE` in process memory. Two gateway replicas have independent caches; no shared invalidation mechanism is defined here.
 - `values-local.yaml` configures HTTP hosts and does not set an Ingress TLS Secret. TLS/cert-manager is not configured by the local values.
