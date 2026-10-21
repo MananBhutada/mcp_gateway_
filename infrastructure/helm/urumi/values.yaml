@@ -14,6 +14,10 @@ ingress:
 wordpress:
   # Use https when TLS is terminated at the Ingress in production.
   scheme: http
+llm:
+  # OpenAI-compatible chat-completions base URL. Empty disables chat until configured.
+  baseUrl: ""
+  model: ""
 storage:
   className: ""
   mysql: 2Gi
@@ -34,5 +38,5 @@ secrets:
   wooConsumerKey: ""
   wooConsumerSecret: ""
   wooMcpToken: ""
-  anthropicApiKey: ""
+  llmApiKey: ""
 networkPolicies: true
