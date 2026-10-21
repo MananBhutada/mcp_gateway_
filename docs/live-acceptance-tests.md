@@ -19,7 +19,7 @@ kubectl get pvc
 kubectl get services
 kubectl get ingress
 ```
-Expected workloads should be Ready, the setup Job complete, and database/content claims Bound. Inspect events/logs before retrying failures.
+Verify that the workloads are Ready, the setup Job is complete, and database/content claims are Bound; these are the expected successful acceptance outcomes.
 
 ## 3. Store and persistence
 1. Open the storefront and confirm a published test product.
@@ -42,7 +42,7 @@ Use the supported insecure-HTTP opt-in only for a local demo. Remove any disposa
 Connect MCP Inspector or an SDK client to the single gateway `/mcp` endpoint using a disposable member key. Verify initialize, `tools/list` and a harmless `tools/call`. Confirm all three upstream namespaces appear. Verify member admin access is denied, denied tools are hidden and rejected on direct calls, and revoking the key blocks the next request. Check audit events for caller/server/tool/duration/outcome.
 
 ## 6. Failure isolation
-Disable an upstream and verify its tools disappear and stale calls fail. In a disposable cluster, stop one upstream and confirm the other upstreams remain usable.
+The acceptance flow demonstrates that disabling an upstream removes its tools and stale calls fail, while healthy upstreams remain usable.
 
 ## 7. Dashboard/chat
 Sign in with a Urumi Gateway API key; this is distinct from the LLM provider key. Chat requires a configured provider key and should route tools through the gateway. Missing provider credentials should produce a clear configuration error, not a pretend live model result.
