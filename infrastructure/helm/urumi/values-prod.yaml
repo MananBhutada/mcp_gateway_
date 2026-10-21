@@ -7,6 +7,10 @@ ingress:
   tlsSecret: urumi-tls
 wordpress:
   scheme: https
+llm:
+  # Set these for the provider selected by the deployment; never put the key here.
+  baseUrl: https://openrouter.ai/api/v1
+  model: openrouter/free
 storage: {className: local-path, mysql: 10Gi, wordpress: 10Gi, postgres: 5Gi}
 replicas: {gateway: 2, dashboard: 2, mcp: 1}
 images:
@@ -28,4 +32,5 @@ images:
 #   --set-string secrets.wpAdminPassword="$WP_ADMIN_PASSWORD" \
 #   --set-string secrets.wooConsumerKey="$WOO_CONSUMER_KEY" \
 #   --set-string secrets.wooConsumerSecret="$WOO_CONSUMER_SECRET" \
-#   --set-string secrets.wooMcpToken="$WOO_MCP_TOKEN"
+#   --set-string secrets.wooMcpToken="$WOO_MCP_TOKEN" \
+#   --set-string secrets.llmApiKey="$LLM_API_KEY"

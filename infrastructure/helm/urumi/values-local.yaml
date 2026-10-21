@@ -4,14 +4,17 @@ ingress:
   className: traefik
   storeHost: store.urumi.local
   dashboardHost: dashboard.urumi.local
+llm:
+  baseUrl: https://openrouter.ai/api/v1
+  model: openrouter/free
 secrets:
   mysqlRootPassword: local-root-only
   mysqlPassword: local-wp-only
   postgresPassword: local-pg-only
   gatewaySecretKey: local-dev-secret-key-not-for-production-123456
-  bootstrapAdminKey: urumi_live_local_demo_key_do_not_reuse_123456789
+  bootstrapAdminKey: local-demo-bootstrap-key-not-for-reuse-123456789
   wpAdminPassword: local-admin-only
   wooConsumerKey: ck_local_demo_only
   wooConsumerSecret: cs_local_demo_only
   wooMcpToken: local-woo-mcp-token-only
-  anthropicApiKey: ""
+  llmApiKey: ""
