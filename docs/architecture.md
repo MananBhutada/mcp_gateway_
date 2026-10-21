@@ -1,82 +1,40 @@
-# Urumi MCP Gateway — architecture
+# Architecture — Urumi MCP Gateway
 
-## System boundary
+## Components
 
-The Kubernetes cluster is the trust boundary. Only the dashboard and WooCommerce storefront are exposed through Ingress. The gateway is reached through the dashboard's same-origin proxy for browser use and through its configured MCP endpoint for external MCP clients. WooCommerce MCP, Weather MCP, Currency MCP, MySQL and PostgreSQL are cluster-internal services and must not have public Ingress resources.
+- **Dashboard:** React/TypeScript UI for gateway access, registry and administrative workflows; the same-origin proxy forwards API and MCP requests to the gateway.
+- **Gateway:** FastAPI control/data plane. Authenticates caller keys, applies role and tool permissions, lists namespaced tools, routes calls to upstream MCP servers, and records audit events.
+- **WooCommerce MCP:** exposes product/order tools and uses WooCommerce REST API credentials injected at runtime.
+- **Weather MCP and Currency MCP:** independent upstreams demonstrating multi-server aggregation and isolation.
+- **Storefront:** WordPress with WooCommerce, backed by MySQL and persistent volumes.
+- **Gateway state:** PostgreSQL holds users, API-key metadata, server registry, permissions, invitations and audit records.
+- **Kubernetes/Helm:** deploys services, internal Services, Ingress, Secrets, PVCs, probes, resource controls and NetworkPolicies.
 
-## Text architecture diagram
+## Request flow
 
-```text
-USERS / CLIENTS
-  Team members ────────────────┐
-  Dashboard chat agent ────────┤
-  Claude / Cursor / MCP client ├── Gateway URL + per-user API key
-                               │
-EXTERNAL ACCESS                │
-  dashboard.urumi.local ──┐    │
-  store.urumi.local ──────┼─ Ingress Controller
-                          │    │
-KUBERNETES CLUSTER        │    ▼
-  ┌───────────────────────┴─────────────────────────────────────┐
-  │ Dashboard (React)                                           │
-  │  Admin UI · user/API-key management · chat · audit logs     │
-  │        │ same-origin /api and /mcp proxy                     │
-  │        ▼                                                     │
-  │ Gateway Backend (FastAPI)                                    │
-  │  Authentication · RBAC · tool permissions                    │
-  │  Registry · aggregation · namespacing · routing               │
-  │  Timeout/failure isolation · audit logging                    │
-  │  MCP SERVER endpoint (/mcp)                                   │
-  │        │                                                     │
-  │        └── Gateway MCP CLIENT ── internal MCP HTTP ──┐        │
-  │                                                      ▼        │
-  │  ┌──────────────────┐ ┌────────────────┐ ┌────────────────┐ │
-  │  │ WooCommerce MCP   │ │ Weather MCP    │ │ Currency MCP   │ │
-  │  │ products/orders   │ │ forecast       │ │ conversion     │ │
-  │  └────────┬─────────┘ └────────────────┘ └────────────────┘ │
-  │           │ WooCommerce REST API (credentials from Secret)   │
-  │           ▼                                                  │
-  │  WordPress + WooCommerce ───────────────► MySQL               │
-  │       │                                                     │
-  │       └── persistent WordPress content/uploads               │
-  │                                                              │
-  │  PostgreSQL: gateway users, hashed API keys, registry,        │
-  │              invitations, permissions and audit records      │
-  │  Kubernetes Secrets: DB passwords, gateway secret,           │
-  │                      WP admin credential, Woo REST keys,     │
-  │                      upstream MCP credentials                │
-  │  PVCs: WordPress files, MySQL data, PostgreSQL data           │
-  │  Helm: Deployments/StatefulSets, Services, Ingress,           │
-  │        NetworkPolicies, probes, resource requests/limits      │
-  └──────────────────────────────────────────────────────────────┘
+1. MCP client sends a request to the gateway `/mcp` endpoint with a per-user bearer key.
+2. Gateway authenticates the key and resolves the caller/role.
+3. `tools/list` combines tools from enabled/healthy upstreams, prefixes names with the upstream identifier, and applies caller permissions.
+4. `tools/call` validates the requested tool, checks permission again at execution time, invokes the relevant upstream with a timeout, and records the result.
+5. The gateway returns a safe result/error. Upstream secrets are not returned to the client or model.
 
-MCP TOOL CALL:
-  Client -> Gateway (/mcp) -> authenticate API key -> authorize tool
-         -> resolve namespaced tool -> call upstream MCP -> audit result
-         -> return result to the same client.
+## Trust boundaries
 
-STOREFRONT ORDER:
-  Browser -> store Ingress -> WordPress/WooCommerce -> MySQL.
-  WooCommerce MCP reads/manages orders through the WooCommerce REST API;
-  the gateway does not connect directly to the store database.
-```
+- Public-facing entry points should be limited to the dashboard and storefront Ingress.
+- WooCommerce MCP, Weather MCP, Currency MCP, MySQL and PostgreSQL should remain internal.
+- Commerce data is accessed through WooCommerce REST, not direct gateway-to-MySQL queries.
+- Runtime credentials are sourced from Kubernetes Secrets, not committed source files.
+- NetworkPolicies restrict traffic to the required callers; rendered and live policy behavior must be verified.
 
-## Trust and data flow
+## Invariants
 
-1. **Browser and external clients:** dashboard users authenticate to the platform. External MCP clients use one gateway URL and a user-specific API key. Raw keys are shown only at creation; stored key material is hashed.
-2. **Gateway:** validates the caller, checks the user's role and explicit tool permissions, resolves the tool through the registry, invokes the upstream MCP server, and writes an audit record with caller, server, tool, duration and outcome.
-3. **Upstream servers:** accept calls only from the gateway's internal network path. Their credentials are not returned to clients or sent to the model.
-4. **WooCommerce:** the Woo MCP calls the WooCommerce REST API. WooCommerce persists products, orders and customer/store data in MySQL. The gateway must never query MySQL directly for commerce operations.
-5. **Secrets and storage:** Kubernetes Secrets provide runtime credentials; PVCs retain WordPress files and database files across pod restarts. A PVC is persistence, not a backup strategy.
-6. **Ingress:** only dashboard and storefront hosts are routed publicly. MCP upstreams and database services have no public Ingress. NetworkPolicies should constrain internal traffic to required paths.
-7. **Environments:** one Helm chart is rendered with `values-local.yaml` for Kind/k3d and `values-prod.yaml` for a VPS/k3s cluster. Production requires TLS, unique secrets and persistent volumes.
+- All tool calls from chat and external MCP clients pass through gateway authorization and audit.
+- Server/tool names are collision-safe.
+- Disabling an upstream removes its tools from discovery and rejects stale calls.
+- One unhealthy upstream must not prevent healthy upstreams from being called.
+- MySQL and PostgreSQL have separate credentials and persistent claims.
+- PVCs are persistence, not backup; a backup/restore plan is still needed for real production use.
 
-## Required invariants
+## Deployment environments
 
-- The dashboard chat agent and external MCP clients call tools only through the gateway.
-- Every tool call is authorized and audited, including failures.
-- Disabling an upstream removes its tools from discovery and prevents calls through stale tool lists.
-- An unhealthy upstream must not prevent calls to healthy upstreams.
-- MySQL and PostgreSQL are distinct data stores with separate credentials and PVCs.
-- WooCommerce API credentials, database passwords, gateway signing/encryption keys and user API keys must never be committed as live secrets.
-- The architecture diagram describes the target design; only passing tests and live deployment evidence count as proof that a path works.
+Use the same chart with `values-local.yaml` for local k3d and `values-prod.yaml` for a production-like k3s/VPS environment. Production additionally requires TLS, unique secrets, restricted ingress/egress, operational backups, and monitoring. The architecture is the intended design; acceptance evidence is tracked in `STATUS.md` and `live-acceptance-tests.md`.
