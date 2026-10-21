@@ -261,7 +261,7 @@ All steps below were completed in the recorded local k3d run using `infrastructu
 | Step | Action (UI or exact command) | Expected result | Status |
 |---|---|---|---|
 | Store checkout | Open `http://store.urumi.local`, add a product to cart, complete checkout with COD, then open WooCommerce → Orders in wp-admin. | The order appears in WooCommerce admin with its order details. | Verified, local k3d run |
-| Persistence | Restart the relevant store pod using `kubectl delete pod -l app=wordpress`; wait for its replacement with `kubectl get pods -w`, then recheck the order in wp-admin. | The existing order remains after pod restart. | Verified, local k3d run |
+| Persistence | Restart WordPress with `kubectl rollout restart deployment/wordpress`; wait with `kubectl rollout status deployment/wordpress`, then recheck the order in wp-admin. | The existing order remains after pod restart. | Verified, local k3d run |
 | User A chat product | In the dashboard chat agent, ask it to create a named product with a price and publish it. | The product is published and appears on the storefront; tool calls appear in the trace. | Verified, local k3d run |
 | User A orders question | After the manual storefront order, ask user A's chat agent: "What orders came in today?" | The response identifies the order; the trace shows the tool calls. | Verified, local k3d run |
 | User B external MCP client | Configure an external MCP client with `http://dashboard.urumi.local/mcp` and user B's API key only. Ask: "What orders came in today?" | The client connects, discovers tools from every enabled server, and answers the orders question. | Verified, local k3d run |
