@@ -47,3 +47,24 @@ def test_customer_projection_omits_address_phone_and_unrecognized_fields():
         "id": 42, "email": "customer@example.test", "first_name": "Ada", "last_name": "Lovelace",
         "username": "ada", "billing_city": "Pune", "billing_country": "IN",
     }
+
+
+def test_required_assignment_tool_names_are_registered():
+    from app.tools import products, orders, customers
+
+    class ToolRegistry:
+        def __init__(self):
+            self.registered = {}
+
+        def tool(self):
+            def decorator(function):
+                self.registered[function.__name__] = function
+                return function
+            return decorator
+
+    registry = ToolRegistry()
+    products.register(registry)
+    orders.register(registry)
+    customers.register(registry)
+
+    assert {"get_products", "get_orders", "create_order", "get_customer"} <= set(registry.registered)
