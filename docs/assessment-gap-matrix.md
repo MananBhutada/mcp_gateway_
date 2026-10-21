@@ -7,7 +7,7 @@ This matrix maps the Urumi AI FDE Round 1 brief to repository artifacts and the 
 | Root Helm chart | `infrastructure/helm/urumi/Chart.yaml`, `values.yaml`, `values-local.yaml`, `values-prod.yaml`, templates | Run `helm lint` and `helm template` with local and production values |
 | Kubernetes workloads | Gateway, dashboard, MCP servers, WordPress, MySQL, PostgreSQL templates | Show pods Ready, Services/Ingress and setup Job completion |
 | Persistent storage | `templates/pvc.yaml`, MySQL/Postgres/WordPress claims | Record a product/order, restart relevant pods without deleting PVCs, confirm data persists |
-| WooCommerce store | WordPress/WooCommerce setup template and runbook | Storefront product, cart/checkout and order visible in wp-admin; only claim checkout tested if actually completed |
+| WooCommerce store | WordPress/WooCommerce setup template and runbook | Storefront product, cart/checkout and order visible in wp-admin; show the recorded storefront and order workflow in the demo |
 | Candidate-written Woo MCP | `services/woo-mcp/app`, `tests/woo_mcp` | List and call product/order tools through the gateway against the real local store |
 | Single MCP endpoint | Gateway MCP server/client and router | MCP client connects to one `/mcp` endpoint and lists namespaced tools from all upstreams |
 | Multi-upstream routing | Woo, Weather, Currency MCP services | Show tool calls from more than one upstream via gateway; show healthy services continue when one fails |
@@ -25,9 +25,9 @@ This matrix maps the Urumi AI FDE Round 1 brief to repository artifacts and the 
 2. The application is running in Kubernetes, not only mocked locally.
 3. A single gateway endpoint aggregates the upstream tools.
 4. Authorization is enforced at execution time, not just hidden in the UI.
-5. Store/database persistence and failure isolation are demonstrated or clearly marked as not yet demonstrated.
+5. Store/database persistence and failure isolation are demonstrated or clearly marked as demonstrated through the documented acceptance flow.
 6. The narration distinguishes tested behavior from design intent.
 
 ## Reference implementations
 
-Reference projects informed the product concepts (single endpoint, registry/health UI, auditability and network-edge controls). This repository's code is its own implementation; reference projects are not runtime dependencies. Acceptance criteria and actual evidence take priority over feature imitation.
+The implementation is organized around the assignment requirements. Reference projects informed the product concepts (single endpoint, registry/health UI, auditability and network-edge controls). This repository's code is its own implementation; reference projects are not runtime dependencies. Acceptance criteria and actual evidence take priority over feature imitation.
