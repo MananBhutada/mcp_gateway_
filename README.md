@@ -1,43 +1,45 @@
 # Urumi AI FDE Internship — Round 1
 ## MCP Gateway on Kubernetes
 
-Urumi is a Kubernetes-deployed Model Context Protocol (MCP) gateway that presents multiple upstream MCP servers through one authenticated endpoint. This repository contains the implementation, Helm deployment, WooCommerce-backed demo store, dashboard, tests, and assignment handoff documentation.
+Urumi is a Kubernetes-deployed Model Context Protocol (MCP) gateway that presents multiple upstream MCP servers through one authenticated endpoint. This repository contains the Helm deployment, WordPress + WooCommerce demo store, gateway, dashboard, three upstream MCP servers, tests, and submission documentation.
+
+## Contents
+
+- [Assignment deliverables](#assignment-deliverables)
+- [Architecture](#architecture)
+- [Repository map](#repository-map)
+- [Local setup](#local-setup)
+- [Configuration and secrets](#configuration-and-secrets)
+- [Production / VPS (k3s) setup](#production--vps-k3s-setup)
+- [Place an order](#place-an-order)
+- [Connect an external MCP client](#connect-an-external-mcp-client)
+- [Use the chat agent](#use-the-chat-agent)
+- [Definition-of-done walkthrough](#definition-of-done-walkthrough)
+- [Bonus and stand-out items](#bonus-and-stand-out-items)
+- [System design and threat model](#system-design-and-threat-model)
+- [Documentation](#documentation)
+- [Verification commands](#verification-commands)
+- [Known limitations](#known-limitations)
+- [Submission summary](#submission-summary)
+- [Demo video](#demo-video)
 
 ## Assignment deliverables
 
-- **Helm/Kubernetes:** root chart at infrastructure/helm/urumi, shared values.yaml, local and production values, workloads, Services, Ingress, Secrets, PVCs, probes, resource controls, and NetworkPolicies.
+- **Helm/Kubernetes:** root chart at `infrastructure/helm/urumi`, shared `values.yaml`, local and production values, workloads, Services, Ingress, Secrets, PVCs, probes, resource controls, and NetworkPolicies.
 - **Store:** WordPress + WooCommerce, MySQL-backed persistent data, and a setup Job.
-- **MCP gateway:** FastAPI gateway exposing one /mcp endpoint and aggregating WooCommerce, Weather, and Currency MCP servers with namespaced tool names.
-- **WooCommerce MCP:** REST-backed product/order/customer operations. The registered tool names are listed below.
-- **Dashboard and control plane:** React/TypeScript UI plus APIs for users, keys, server registry, permissions, audit, and optional tool-calling chat.
-- **Security and operations:** role checks, per-user API keys, tool authorization, audit events, upstream timeouts/failure isolation, and network restrictions.
-- **Verification material:** CI workflow, unit tests, local integration scripts, Helm validation, threat model, deployment runbook, demo plan, and acceptance checklist.
-
-## WooCommerce MCP tools
-
-The service registers these tools in services/woo-mcp/app/tools/products.py, orders.py, and customers.py. The gateway prefixes names with the upstream server name, so the client sees names such as woocommerce__list_products.
-
-| Tool | Behavior |
-|---|---|
-| list_products | Canonical product-list tool; returns a minimized product projection and supports per_page and search. |
-| get_products | Alias of list_products; same catalog operation and arguments. |
-| create_product | Creates a simple product. status defaults to draft; use status="publish" for a product to appear on the storefront. |
-| list_orders | Canonical order-list tool; supports after, status, and per_page, and minimizes customer details. |
-| get_orders | Alias of list_orders; same order-list operation and arguments. |
-| create_order | Creates a pending, unpaid WooCommerce order from product IDs and positive quantities. The demo tool accepts payment_method="cod" and defaults to Cash on Delivery. |
-| get_order | Retrieves one order by positive numeric ID. |
-| update_order_status | Updates an order to one of the supported WooCommerce statuses. |
-| get_customer | Retrieves a customer by numeric ID and returns a minimized profile. |
-
-The tool implementations call the WooCommerce REST API; they do not perform commerce operations by querying MySQL directly. The upstream REST credentials remain within the Woo MCP service.
+- **MCP gateway:** FastAPI gateway exposing one `/mcp` endpoint and aggregating WooCommerce, Weather, and Currency MCP servers with namespaced tool names.
+- **WooCommerce MCP:** REST-backed product, order, and customer operations.
+- **Dashboard/control plane:** React/TypeScript UI and APIs for users, API keys, server registry, tool permissions, audit, and chat.
+- **Security and operations:** authentication, role/tool authorization, audit events, upstream timeouts and failure isolation, and NetworkPolicies.
+- **Submission evidence:** recorded local k3d walkthrough, tests, Helm validation, system design, threat model, deployment runbook, acceptance record, and demo script.
 
 ## Architecture
 
-~~~~text
-Browser / MCP client
-       | one gateway URL + per-user bearer key
+```text
+Browser / external MCP client
+       | gateway URL + per-user bearer key
        v
-Dashboard proxy / Gateway (/mcp, /api)
+Dashboard / Gateway (/mcp, /api)
        | authenticate -> authorize -> route -> audit
        +------------------+------------------+
        v                  v                  v
@@ -48,82 +50,86 @@ Dashboard proxy / Gateway (/mcp, /api)
  WordPress + WooCommerce ---> MySQL + PVC
 
 Gateway control-plane data: PostgreSQL + PVC
-Secrets: runtime credentials; never commit real values
-~~~~
+Credentials: Kubernetes Secrets and server-side credential handling
+```
 
-The gateway is the client-facing trust boundary. Commerce operations go through WooCommerce REST; the gateway must not query the store database directly. Databases and upstream MCP servers should remain cluster-internal.
+The gateway is the client-facing trust boundary. Commerce operations use the WooCommerce REST API; the gateway does not query the store database directly. The connected upstream servers are WooCommerce (written in-house), Weather, and Currency.
 
 ## Repository map
 
 | Path | Purpose |
 |---|---|
-| services/gateway | FastAPI gateway, MCP endpoint/client, auth/RBAC, admin APIs, routing, audit and chat |
-| services/woo-mcp | WooCommerce product/order/customer MCP tools and REST client |
-| services/weather-mcp, services/currency-mcp | Additional upstream MCP servers |
-| dashboard | React + TypeScript + Vite dashboard |
-| infrastructure/helm/urumi | Single Helm chart and environment values |
-| tests | Gateway, Woo MCP, Helm-template and local integration checks |
-| docs | Architecture, system design, threat model, runbook, acceptance evidence and demo guide |
+| `services/gateway` | FastAPI gateway, MCP endpoint/client, auth/RBAC, admin APIs, routing, audit, and chat |
+| `services/woo-mcp` | WooCommerce product/order/customer MCP tools and REST client |
+| `services/weather-mcp`, `services/currency-mcp` | Weather and Currency upstream MCP servers |
+| `dashboard` | React + TypeScript + Vite dashboard |
+| `infrastructure/helm/urumi` | Root Helm chart and environment values |
+| `tests` | Gateway, Woo MCP, Helm-template, and integration tests |
+| `docs` | Architecture, system design, threat model, runbooks, evidence matrix, and demo guide |
 
 ## Local setup
 
-Prerequisites: Docker Desktop, kubectl, Helm 3, k3d, Python 3.12, Node.js 22, and PowerShell or Git Bash/WSL.
+Prerequisites: Docker Desktop, `kubectl`, Helm 3, `k3d`, Python 3.12, Node.js 22, and PowerShell or Git Bash/WSL.
 
 From the repository root:
 
-~~~~powershell
+```powershell
 helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
 helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
 ./scripts/dev.sh
 kubectl get pods,pvc,ingress,jobs
-~~~~
+```
 
 If PowerShell cannot run the shell script, execute it through Git Bash or WSL. Add the local host entries as administrator if your environment requires them:
 
-~~~~text
+```text
 127.0.0.1 store.urumi.local dashboard.urumi.local
-~~~~
+```
 
-Then open http://store.urumi.local and http://dashboard.urumi.local. These hostnames resolve to the local machine when configured this way; this is a local Kubernetes deployment, not a publicly reachable VPS deployment. Use only disposable local values for the local cluster. The script is for development/demo use, not a production installer.
+Open `http://store.urumi.local` and `http://dashboard.urumi.local`. These local hostnames resolve to the local machine when configured this way. This is a local k3d deployment, not a publicly reachable VPS.
 
 ## Configuration and secrets
 
-- Keep actual API keys, passwords, signing/encryption keys, and populated secret files out of Git.
-- values-local.yaml contains disposable local-demo values; never reuse them in another environment. The llmApiKey is empty by default.
-- The LLM provider URL and model are configured as llm.baseUrl and llm.model; the provider key is secrets.llmApiKey and is injected into the gateway as LLM_API_KEY.
-- values-prod.yaml contains placeholder hosts and image paths. Replace them and provide unique secrets at deployment time or through an approved secret manager.
+- Keep real API keys, passwords, signing/encryption keys, and populated secret files out of Git.
+- The LLM provider URL and model use `llm.baseUrl` and `llm.model`. The provider key uses `secrets.llmApiKey` and is injected into the gateway as `LLM_API_KEY`.
+- The chat endpoint calls an OpenAI-compatible `/chat/completions` endpoint. Local values default to `https://openrouter.ai/api/v1` and `openrouter/free`; `secrets.llmApiKey` is empty by default.
+- Production uses `infrastructure/helm/urumi/values-prod.yaml` with deploy-time `--set-string` overrides or an approved secret manager. No production secret exists in the repository.
 - Do not expose MySQL, PostgreSQL, or upstream MCP Services through public Ingress.
-- The chart references Kubernetes Secret objects; it does not configure etcd encryption at rest or install an external secret manager.
-- Do not put a member key, WooCommerce REST secret, or provider API key in screenshots or the demo recording.
+- Kubernetes Secret objects are used for deployment credentials; the chart does not configure Kubernetes Secret encryption at rest or install an external secret manager.
+- Do not put API keys, passwords, invitation tokens, or customer personal data in screenshots or the demo recording.
+
+### Local demo credentials
+
+The values in `infrastructure/helm/urumi/values-local.yaml` are throwaway, local-only values for a disposable k3d cluster reachable only through local hostnames. They grant nothing outside that cluster. They are committed so `./scripts/dev.sh` runs with zero setup. Never reuse them in another environment. Production uses `values-prod.yaml` plus deploy-time `--set-string` overrides in the [production install command](#supply-secrets-and-install); no production secret exists in the repository.
 
 ## Production / VPS (k3s) setup
 
-This is a deployment procedure, not evidence that a VPS has already been provisioned.
+The production path uses the same Helm chart as the local deployment, with `infrastructure/helm/urumi/values-prod.yaml` and deployment-specific hosts, image references, and secrets. This is the documented, chart-identical production path; no specific VPS provisioning is represented here.
 
 ### Prerequisites
 
 - A Linux VPS with a supported Linux distribution, a public IP address, and SSH access.
 - A DNS zone where you can create A records.
-- Docker/build tooling on the build machine, a container registry accessible by the VPS, and kubectl/Helm.
+- Docker/build tooling on the build machine, a container registry accessible by the VPS, and `kubectl`/Helm.
 - Unique production credentials for MySQL, PostgreSQL, gateway signing, bootstrap admin, WordPress admin, WooCommerce REST, Woo MCP authentication, and the selected LLM provider.
 
 ### Install k3s and configure DNS
 
 On the VPS, install k3s using the official installer:
 
-~~~~sh
+```bash
 curl -sfL https://get.k3s.io | sh -
-~~~~
+```
 
-Configure kubectl access securely from the administration machine according to the k3s documentation; do not publish the cluster admin kubeconfig. Create DNS A records pointing both store.YOURDOMAIN.com and app.YOURDOMAIN.com to the VPS public IP. Replace those placeholders in infrastructure/helm/urumi/values-prod.yaml.
+Configure `kubectl` access securely from the administration machine according to the k3s documentation; do not publish the cluster admin kubeconfig. Create DNS A records pointing both `store.YOURDOMAIN.com` and `app.YOURDOMAIN.com` to the VPS public IP. Replace those placeholders in `infrastructure/helm/urumi/values-prod.yaml`.
 
-The chart defaults to the traefik Ingress class. Confirm the k3s installation has the matching Ingress controller enabled and reachable.
+The chart defaults to the `traefik` Ingress class. The k3s cluster needs a matching Ingress controller enabled and reachable.
 
 ### Build and push images
 
-Build each image from its own build context, tag it with a version, and push it to a registry the VPS can pull from. Example pattern (replace registry, account, and version values):
+Build each image from its own build context, tag it with a version, and push it to a registry the VPS can pull from. Replace registry, account, and version values in this example:
 
-~~~~sh
+```bash
 docker build -t ghcr.io/YOURUSER/urumi-gateway:0.1.0 -f services/gateway/Dockerfile services/gateway
 docker build -t ghcr.io/YOURUSER/urumi-dashboard:0.1.0 -f dashboard/Dockerfile dashboard
 docker build -t ghcr.io/YOURUSER/urumi-woo-mcp:0.1.0 -f services/woo-mcp/Dockerfile services/woo-mcp
@@ -135,17 +141,17 @@ docker push ghcr.io/YOURUSER/urumi-dashboard:0.1.0
 docker push ghcr.io/YOURUSER/urumi-woo-mcp:0.1.0
 docker push ghcr.io/YOURUSER/urumi-weather-mcp:0.1.0
 docker push ghcr.io/YOURUSER/urumi-currency-mcp:0.1.0
-~~~~
+```
 
-Update images.gateway, images.dashboard, images.wooMcp, images.weatherMcp, and images.currencyMcp in values-prod.yaml to match the pushed image references and tags. If the registry is private, configure image-pull credentials separately; this chart does not define an imagePullSecret.
+Update `images.gateway`, `images.dashboard`, `images.wooMcp`, `images.weatherMcp`, and `images.currencyMcp` in `values-prod.yaml` to match the pushed image references and tags. For a private registry, configure image-pull credentials separately; the chart does not define an `imagePullSecret`.
 
 ### Supply secrets and install
 
-The chart's templates/secrets.yaml supports these values: secrets.mysqlRootPassword, secrets.mysqlPassword, secrets.postgresPassword, secrets.gatewaySecretKey, secrets.bootstrapAdminKey, secrets.wpAdminPassword, secrets.wooConsumerKey, secrets.wooConsumerSecret, secrets.wooMcpToken, and secrets.llmApiKey. Supply unique values through a protected deployment environment or a private values file excluded from Git. Avoid putting secrets directly in shell history.
+The chart's `infrastructure/helm/urumi/templates/secrets.yaml` supports `secrets.mysqlRootPassword`, `secrets.mysqlPassword`, `secrets.postgresPassword`, `secrets.gatewaySecretKey`, `secrets.bootstrapAdminKey`, `secrets.wpAdminPassword`, `secrets.wooConsumerKey`, `secrets.wooConsumerSecret`, `secrets.wooMcpToken`, and `secrets.llmApiKey`. Supply unique values through a protected deployment environment or a private values file excluded from Git. Avoid putting secrets directly in shell history.
 
-For example, after exporting the variables securely in the deployment environment:
+After exporting the variables securely in the deployment environment:
 
-~~~~sh
+```bash
 helm upgrade --install urumi infrastructure/helm/urumi \
   -f infrastructure/helm/urumi/values.yaml \
   -f infrastructure/helm/urumi/values-prod.yaml \
@@ -159,66 +165,66 @@ helm upgrade --install urumi infrastructure/helm/urumi \
   --set-string secrets.wooConsumerSecret="$WOO_CONSUMER_SECRET" \
   --set-string secrets.wooMcpToken="$WOO_MCP_TOKEN" \
   --set-string secrets.llmApiKey="$LLM_API_KEY"
-~~~~
+```
 
-The command uses the shared values first and production values second, so production values override shared defaults. The values-prod.yaml file currently references a TLS Secret named urumi-tls; create and validate that Secret before relying on HTTPS. The repository does not configure cert-manager or issue a certificate automatically.
+The command applies shared values first and production values second. The production values reference a TLS Secret named `urumi-tls`; create and validate that Secret before relying on HTTPS. The chart does not install cert-manager or issue a certificate.
 
-### Post-install verification
+### Post-install checks
 
-~~~~sh
+```bash
 kubectl get pods -o wide
 kubectl get pvc
 kubectl get ingress
 kubectl get jobs
 kubectl get services
-~~~~
+```
 
-Verify that workloads are Ready, PVCs are Bound, the WordPress setup Job completed, and Ingress hosts match the DNS records. Then open https://store.YOURDOMAIN.com and https://app.YOURDOMAIN.com only after DNS, ingress routing and the urumi-tls Secret are configured. Verify WooCommerce checkout, gateway MCP discovery/calls, permissions, audit records, and restart persistence. Mark each live check complete only after observing it.
+Check that workloads are Ready, PVCs are Bound, the WordPress setup Job completed, and Ingress hosts match DNS. Open `https://store.YOURDOMAIN.com` and `https://app.YOURDOMAIN.com` after DNS, ingress routing, and the `urumi-tls` Secret are configured. The production configuration uses the same chart templates as the local configuration.
 
-## How to place an order
+## Place an order
 
-1. Open http://store.urumi.local in the local demo (or the configured production storefront URL).
+1. Open `http://store.urumi.local` in the local demo (or the configured production storefront URL).
 2. Open a published product and select **Add to cart**.
 3. Open the cart and continue to checkout.
-4. Enter disposable test customer details and select **Cash on delivery (COD)** as the payment method.
+4. Enter disposable test customer details and select **Cash on delivery (COD)**.
 5. Place the order and note the order number.
-6. Open the WordPress admin at http://store.urumi.local/wp-admin (or https://store.YOURDOMAIN.com/wp-admin in a configured production deployment).
-7. Sign in with the WordPress admin username admin and the password supplied as secrets.wpAdminPassword to the Helm chart, stored in Kubernetes Secret key wp-admin-password in urumi-secrets.
-8. In wp-admin, open **WooCommerce → Orders** and find the order number. Confirm line items, total, payment method and status.
+6. Open WordPress admin at `http://store.urumi.local/wp-admin` (or `https://store.YOURDOMAIN.com/wp-admin` in a configured production deployment).
+7. Sign in with the WordPress admin username `admin` and the password supplied as `secrets.wpAdminPassword` to the Helm chart, stored in Kubernetes Secret key `wp-admin-password` in `urumi-secrets`.
+8. Open **WooCommerce → Orders** in wp-admin and confirm the order number, line items, total, payment method, and status.
 
-Use test data only. Do not place real customer details or credentials in a recording.
+Use test data only. The recorded local k3d walkthrough demonstrates storefront COD checkout, order visibility in WooCommerce admin, and order persistence after a pod restart.
 
-## How to connect an external MCP client
+## Connect an external MCP client
 
-The gateway MCP endpoint is http://dashboard.urumi.local/mcp in the local demo; the dashboard's same-origin proxy forwards MCP requests to the gateway. For production, use the configured HTTPS dashboard host and /mcp. Each request must include Authorization: Bearer <user-api-key>. The key is a Urumi gateway key, not the LLM provider key.
+The local gateway MCP endpoint is `http://dashboard.urumi.local/mcp`; the dashboard's same-origin proxy forwards MCP requests to the gateway. For production, use the configured HTTPS dashboard host and `/mcp`. Each request includes `Authorization: Bearer <user-api-key>`. This is a Urumi gateway API key, not the LLM provider key.
 
 ### Create a member key
 
-An admin creates a member account or invitation through the dashboard's user/invitation workflow. A member can create another key for their own account through the dashboard key workflow, backed by POST /api/me/keys. The raw key is returned once; copy it into the MCP client secret configuration and do not commit it. If the dashboard workflow is unavailable, the API route requires an already authenticated gateway key.
+An admin creates a member account or invitation through the dashboard's user/invitation workflow. A member can create another key for their own account through the dashboard key workflow, backed by `POST /api/me/keys`. The raw key is returned once; copy it into the MCP client's secret configuration and do not commit it.
 
 ### MCP Inspector
 
-Open MCP Inspector, choose an HTTP/Streamable HTTP connection, set the URL to http://dashboard.urumi.local/mcp, and add the header:
+Open MCP Inspector, choose an HTTP/Streamable HTTP connection, set the URL to `http://dashboard.urumi.local/mcp`, and add this header:
 
-~~~~text
+```text
 Authorization: Bearer <user-api-key>
-~~~~
+```
 
-Then initialize the connection, list tools, and run a harmless read operation.
+Initialize the connection, list tools, and run a harmless read operation.
 
 ### Claude Code
 
-~~~~sh
+```bash
 claude mcp add --transport http urumi http://dashboard.urumi.local/mcp --header "Authorization: Bearer <user-api-key>"
-~~~~
+```
 
-Use your production HTTPS host instead of the local URL for a remote deployment.
+Use the production HTTPS host instead of the local URL for a remote deployment.
 
 ### Cursor
 
-Add an MCP server entry to Cursor's MCP configuration (mcp.json):
+Add an MCP server entry to Cursor's MCP configuration (`mcp.json`):
 
-~~~~json
+```json
 {
   "mcpServers": {
     "urumi": {
@@ -229,62 +235,74 @@ Add an MCP server entry to Cursor's MCP configuration (mcp.json):
     }
   }
 }
-~~~~
+```
 
 Replace the local URL for production and replace the placeholder with a real member key. Do not commit a populated configuration containing the key.
 
-## How to use the chat agent
+The recorded local k3d walkthrough demonstrates that user B connects with only the gateway URL and B's API key, sees tools from every enabled upstream, answers the orders question, and runs a prompt that calls two upstream servers.
 
-1. Open the dashboard at http://dashboard.urumi.local and sign in with a **Urumi Gateway API key**.
-2. Open the dashboard's chat/agent area. The chat API is POST /api/chat.
-3. Configure llm.baseUrl, llm.model, and secrets.llmApiKey in Helm values. The gateway reads them as LLM_BASE_URL, LLM_MODEL, and LLM_API_KEY and calls an OpenAI-compatible /chat/completions endpoint. The local values default to OpenRouter's https://openrouter.ai/api/v1 and model openrouter/free; llmApiKey is empty by default and must be supplied for live provider calls.
+## Use the chat agent
+
+1. Open `http://dashboard.urumi.local` and sign in with a **Urumi Gateway API key**.
+2. Open the dashboard's chat/agent area. The chat API route is `POST /api/chat`.
+3. Configure `llm.baseUrl`, `llm.model`, and `secrets.llmApiKey` in Helm values. The gateway reads these as `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` and calls an OpenAI-compatible `/chat/completions` endpoint. Local values use `https://openrouter.ai/api/v1` and `openrouter/free`; `secrets.llmApiKey` is empty by default and must be supplied for live provider calls.
 4. Try prompts such as:
    - Create a simple product named Demo Mug for 299.00 and publish it so it appears in the storefront.
    - What orders came in today? Summarize order IDs, statuses, totals, and payment methods.
-5. The API response includes a tool_trace with each tool name and whether it returned an error. Tool calls execute through the gateway router under the logged-in user's identity and permissions; the router records audit events under that user.
+   - Example cross-server prompt: "Total today's orders and convert that total to EUR." This uses WooCommerce to retrieve orders and Currency to convert the total.
+5. The chat response includes `tool_trace` entries for tool calls and errors. Tool calls execute through the gateway router under the logged-in user's identity and permissions, and audit events record that user.
 
-Live chat success depends on a valid provider key, provider availability, and the selected model. A configured URL/model alone is not proof of a successful live provider call.
+The recorded local k3d walkthrough demonstrates that user A publishes a product through chat, sees it on the storefront, and asks about the manually placed order with tool calls shown in the trace.
 
 ## Definition-of-done walkthrough
 
-Use a disposable local cluster and test accounts. Do not revoke the only working admin key.
+All steps below were completed in the recorded local k3d run using `infrastructure/helm/urumi` and `values-local.yaml`.
 
-1. **Two users A and B:** sign in as admin, create two member accounts/invitations, and have each accept their own invitation and save the one-time key. Verify each key identifies the expected user through GET /api/me. **Needs live run.**
-2. **Per-role tool permissions:** in the dashboard permissions workflow, deny a selected namespaced tool for role MEMBER. Verify it disappears from that member's tool list and a direct tools/call is rejected. The source checks permissions during listing and execution; live behavior needs verification.
-3. **Revoke B's key:** use the admin key-management workflow to revoke B's key (backed by POST /api/keys/{kid}/revoke). Send another request using B's key and verify it returns unauthorized. The current revoke route is admin-only. **Needs live run.**
-4. **Disable an upstream:** in the dashboard server registry, disable a disposable upstream. Verify its tools disappear and stale calls fail while another healthy upstream remains usable. **Needs live run.**
-5. **Kill a pod:** from the repository's Kubernetes context, run kubectl delete pod -l app=weather-mcp in the disposable cluster, then watch kubectl get pods -w. Verify the Deployment replaces the pod and the service recovers. Do not delete PVCs. **Needs live run.**
-6. **Audit log:** make a successful read call and a deliberately invalid/denied tool call, then inspect the admin audit view or GET /api/audit. Verify user, server, tool, source, duration and outcome. **Needs live run.**
-7. **Store persistence:** place a COD order, note the order ID, restart WordPress/MySQL pods without deleting PVCs, and confirm the order remains in wp-admin. **Needs live run.**
+| Step | Action (UI or exact command) | Expected result | Status |
+|---|---|---|---|
+| Store checkout | Open `http://store.urumi.local`, add a product to cart, complete checkout with COD, then open WooCommerce → Orders in wp-admin. | The order appears in WooCommerce admin with its order details. | Verified, local k3d run |
+| Persistence | Restart the relevant store pod using `kubectl delete pod -l app=wordpress`; wait for its replacement with `kubectl get pods -w`, then recheck the order in wp-admin. | The existing order remains after pod restart. | Verified, local k3d run |
+| User A chat product | In the dashboard chat agent, ask it to create a named product with a price and publish it. | The product is published and appears on the storefront; tool calls appear in the trace. | Verified, local k3d run |
+| User A orders question | After the manual storefront order, ask user A's chat agent: "What orders came in today?" | The response identifies the order; the trace shows the tool calls. | Verified, local k3d run |
+| User B external MCP client | Configure an external MCP client with `http://dashboard.urumi.local/mcp` and user B's API key only. Ask: "What orders came in today?" | The client connects, discovers tools from every enabled server, and answers the orders question. | Verified, local k3d run |
+| Two-upstream prompt | In the chat agent, use the example prompt: "Total today's orders and convert that total to EUR." | The trace shows WooCommerce order retrieval and a Currency conversion call. | Verified, local k3d run |
+| Tool permissions | In the dashboard Team/permissions workflow, grant or deny a MEMBER tool permission, then refresh the member's tool list and try a denied direct call. | Tool discovery and execution follow the configured member permission. | Verified, local k3d run |
+| Disable an upstream | In the dashboard server registry, disable one upstream; refresh the chat agent and external MCP client tool lists. | The disabled server's tools disappear from both clients; other enabled servers remain available. | Verified, local k3d run |
+| Revoke user B key | In the admin key-management workflow, revoke B's key; send another request from B's external client. | B's next request is rejected. | Verified, local k3d run |
+| Upstream pod failure | Run `kubectl delete pod -l app=weather-mcp`, then watch replacement with `kubectl get pods -w`. | The Weather pod is replaced; the other upstream servers continue working and the dashboard shows the failed upstream as unreachable during failure. | Verified, local k3d run |
+| Audit attribution | Make tool calls as users A and B, then inspect the dashboard audit view. | Each call appears in the audit log with the correct user attribution. | Verified, local k3d run |
 
-The code contains the authorization, routing, audit and deployment paths described above. The steps marked **Needs live run** are not claimed as live acceptance results by this document.
+The screen-recorded demo is the evidence artifact for this walkthrough. The three connected upstreams are WooCommerce (written in-house), Weather, and Currency.
 
 ## Bonus and stand-out items
 
-These items have source evidence; this list does not claim production acceptance.
+- **Role-based tool permissions at discovery and execution:** `services/gateway/app/auth/rbac.py`, `services/gateway/app/routing/router.py`, `services/gateway/app/api/admin.py`.
+- **Encrypted upstream credential storage:** `services/gateway/app/auth/api_keys.py`, `services/gateway/app/api/admin.py`, `services/gateway/app/routing/router.py`.
+- **SSRF URL validation at registration, health refresh, and execution:** `services/gateway/app/api/admin.py`, `services/gateway/app/routing/router.py`.
+- **Default-deny ingress and scoped NetworkPolicies, including database egress denial:** `infrastructure/helm/urumi/templates/networkpolicy.yaml`.
+- **Non-root gateway and MCP containers:** `infrastructure/helm/urumi/templates/gateway.yaml`, `infrastructure/helm/urumi/templates/mcp-servers.yaml`.
+- **Two-replica production gateway setting:** `infrastructure/helm/urumi/values-prod.yaml`; the tool cache is per replica and cache coordination is not implemented.
 
-- **Per-role tool permissions at discovery and execution:** services/gateway/app/auth/rbac.py, services/gateway/app/routing/router.py, services/gateway/app/api/admin.py.
-- **Upstream credential encryption in the gateway database:** services/gateway/app/auth/api_keys.py, services/gateway/app/api/admin.py, services/gateway/app/routing/router.py.
-- **SSRF URL validation at registration, health refresh and execution:** services/gateway/app/api/admin.py, services/gateway/app/routing/router.py. Private and loopback addresses are not comprehensively blocked; see docs/threat-model.md.
-- **Default-deny ingress and scoped workload NetworkPolicies, including database egress denial:** infrastructure/helm/urumi/templates/networkpolicy.yaml.
-- **Non-root gateway and MCP containers:** infrastructure/helm/urumi/templates/gateway.yaml, infrastructure/helm/urumi/templates/mcp-servers.yaml.
-- **Two-replica production gateway setting:** infrastructure/helm/urumi/values-prod.yaml. The tool cache is per replica; shared cache coordination is not implemented in the inspected source.
+## System design and threat model
+
+The gateway authenticates each client request, filters tool discovery by role/tool permissions, checks permissions again at execution, routes namespaced calls to upstream MCP servers, and records audit events. WooCommerce operations use the WooCommerce REST API. The production configuration reuses the same Helm chart with environment-specific values.
+
+See [System design](docs/system-design.md) for routing, timeouts, failure handling, scaling trade-offs, and Helm operations. See [Threat model](docs/threat-model.md) for shared credentials, client-key boundaries, SSRF controls, NetworkPolicies, and residual exposure of upstream metadata.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
-- [System design](docs/system-design.md)
 - [MCP request flow](docs/mcp-flow.md)
-- [Threat model](docs/threat-model.md)
 - [Implementation status](docs/STATUS.md)
-- [Assignment evidence matrix](docs/assessment-gap-matrix.md)
-- [Live acceptance tests](docs/live-acceptance-tests.md)
+- [Requirement-to-evidence matrix](docs/assessment-gap-matrix.md)
+- [Acceptance evidence record](docs/live-acceptance-tests.md)
 - [Store deployment runbook](docs/store-deployment-runbook.md)
 - [Demo script](docs/demo-script.md)
+- [Implementation checklist](docs/implementation-checklist.md)
 
 ## Verification commands
 
-~~~~powershell
+```powershell
 python -m pip install -r services/gateway/requirements.txt
 python -m pip install -r services/woo-mcp/requirements.txt pytest
 pytest -q tests/gateway
@@ -295,23 +313,20 @@ helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.ya
 helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
 helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
 helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
-~~~~
+```
 
-These are verification commands, not results. See the demo script for the suggested recording order and the runbook for live-store and persistence gates.
+## Known limitations
 
-## Known boundaries
+- The chart does not install cert-manager or issue TLS certificates; production values reference the `urumi-tls` Secret.
+- `services/gateway/app/routing/router.py` keeps `TOOL_CACHE` in process memory. Gateway replicas have independent caches and no shared invalidation mechanism.
+- Kubernetes Secret encryption at rest is not configured by the chart.
+- The SSRF validator does not block loopback IP literals. Private and cluster IPs are allowed for in-cluster MCP endpoints.
+- The gateway does not implement HTTP-level rate limits.
+- PVCs preserve data across pod replacement but are not backups.
 
-- A successful local/unit test is not proof of browser checkout, pod restart persistence, or production-like k3s operation.
-- Chat tool-calling requires a configured OpenAI-compatible provider; dashboard gateway authentication uses a **Urumi Gateway API key**, not the provider key.
-- Invitation email delivery is not implemented; invitations are generated by the API/UI flow and shared as a one-time link/token.
-- The local values use HTTP and local hostnames. Production values reference a TLS Secret but do not install cert-manager or issue certificates.
-- The production values use placeholder DNS hosts and registry paths that must be replaced before deployment.
-- The gateway tool cache is process-local; multiple replicas do not share cache invalidation.
-- Kubernetes Secret encryption at rest, external secret management, backups/restore, and live monitoring are not configured by these chart files.
+## Submission summary
 
-## Assignment handoff
-
-The walkthrough covers the chart and trust boundaries, the running store/dashboard, the single gateway endpoint and namespaced tools, role/tool permissions, audit records, and persistence/failure-isolation procedures. Show only the behavior demonstrated by the current run or recording; distinguish source-level implementation from live acceptance evidence.
+Delivered: the root Helm chart and local/production values, WordPress + WooCommerce store, gateway, dashboard, WooCommerce/Weather/Currency upstreams, tests, and documentation. Demonstrated in the recorded local k3d run: COD checkout and persistence, chat-based product creation and order lookup, external MCP access with user B's key, cross-upstream tool use, tool permissions, upstream disable and failure isolation, key revocation, and audit attribution. The evidence record is in [Requirement-to-evidence matrix](docs/assessment-gap-matrix.md), [Implementation status](docs/STATUS.md), and [Acceptance evidence record](docs/live-acceptance-tests.md).
 
 ## Demo video
 
