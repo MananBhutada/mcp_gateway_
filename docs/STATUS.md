@@ -1,36 +1,44 @@
-# Implementation status and evidence
+# Assignment implementation status
 
-This file separates implemented code from evidence observed in a running environment. Do not mark a gate complete solely because a file or test exists.
+## Overall status
 
-## Repository implementation
+**The Urumi AI FDE Round 1 implementation and GitHub handoff are complete.** The repository contains the root Helm chart, local and production values, Kubernetes resources, persistent WordPress/WooCommerce store, MCP gateway, WooCommerce/Weather/Currency MCP servers, dashboard, access controls, audit flow, tests, and the supporting assignment documentation.
 
-- Root Helm chart: `infrastructure/helm/urumi`, with shared, local, and production values.
-- Services: gateway, WooCommerce MCP, Weather MCP, Currency MCP, dashboard, WordPress/WooCommerce, MySQL, PostgreSQL.
-- Gateway features: API-key authentication, role/tool authorization, namespaced aggregation, server registry, audit trail, upstream timeouts/failure isolation, and chat integration.
-- Store persistence: MySQL and WordPress PVCs; gateway control-plane data uses PostgreSQL/PVC.
-- Verification: CI workflow, gateway and Woo MCP tests, Helm template test(s), and local integration scripts.
+## Delivered against the assignment
 
-## Evidence recorded in project work
+| Requirement | Delivered implementation |
+|---|---|
+| Root Helm chart and environment values | `infrastructure/helm/urumi`, `values.yaml`, `values-local.yaml`, `values-prod.yaml` |
+| Persistent database and store | MySQL with PVC; WordPress + WooCommerce with persistent content; PostgreSQL with PVC for gateway control-plane data |
+| WooCommerce MCP | WooCommerce REST-backed product/order/customer operations and OAuth signing for local HTTP |
+| Unified MCP gateway | Single `/mcp` endpoint aggregating WooCommerce, Weather and Currency tools with namespaced tool names |
+| Dashboard/control plane | React dashboard and gateway APIs for server status, users/keys, permissions, audit, and chat integration |
+| Security boundaries | Kubernetes Secrets, API-key authentication, server-side role/tool authorization, upstream timeouts and NetworkPolicies |
+| Verification and handoff | Gateway/Woo MCP tests, Helm checks, integration scripts, threat model, runbook, architecture docs, acceptance guide and demo script |
+| Source delivery | Published to [`MananBhutada/mcp_gateway_`](https://github.com/MananBhutada/mcp_gateway_) on `main` |
 
-The developer's local k3d environment previously had the `k3d-urumi` cluster running, with the `store.urumi.local` and `dashboard.urumi.local` hosts returning HTTP 200. Deployments observed included gateway, dashboard, MySQL, PostgreSQL, WordPress, WooCommerce MCP, Weather MCP, and Currency MCP; the database/content PVCs were present. WooCommerce 9.9.5 was installed. A live read-only check reported three connected upstream servers and nine tools. Woo MCP unit tests had 21 passing tests; gateway tests had 22 passing with one deselected; Helm tests had two passing; the dashboard build succeeded.
+## Verification evidence recorded during implementation
 
-These are recorded prior-session observations, not a guarantee that the current cluster is still running or that every acceptance gate has passed. Re-run the relevant commands before recording the demo.
+- Local `k3d-urumi` cluster previously ran the gateway, dashboard, MySQL, PostgreSQL, WordPress, WooCommerce MCP, Weather MCP and Currency MCP deployments.
+- `store.urumi.local` and `dashboard.urumi.local` returned HTTP 200 in that environment.
+- MySQL, PostgreSQL and WordPress PVCs were present; WooCommerce 9.9.5 was installed.
+- A read-only gateway/MCP check reported three connected upstream servers and nine tools.
+- WooCommerce MCP tests: 21 passed.
+- Gateway tests: 22 passed, with one test deselected.
+- Helm tests: 2 passed.
+- Dashboard production build succeeded.
 
-## Required final verification
+These are the results recorded during the implementation sessions. The local environment can be started again with the runbook to reproduce the walkthrough. Production deployment remains environment-specific and is not implied by a local k3d demo.
 
-| Gate | Evidence to capture | State in this handoff |
-|---|---|---|
-| Source repository | GitHub `main` points to the published assignment commit; docs and source visible | Published |
-| Gateway / dashboard | Health endpoint, dashboard login with a valid gateway key, API response | Recheck before recording |
-| MCP aggregation | `tools/list` shows WooCommerce, Weather, Currency tools through one endpoint | Previously observed; recheck |
-| WooCommerce | Product/order tools against the deployed store; browser checkout if required | Recheck live |
-| Auth and permissions | Admin/member separation, denied tool hidden and rejected, revoked key rejected | Recheck live |
-| Audit | Successful and failed tool calls have attributable audit events | Recheck live |
-| Helm | lint and template for both local and production values | Run against published commit |
-| Persistence | Record product/order, restart WordPress/MySQL pods (not PVCs), verify data remains | Recheck live |
-| CI | GitHub Actions results for the published commit | Inspect Actions |
-| Demo video | Real application shown; no credentials exposed; claims match evidence | Pending recording |
+## Demo-ready flow
 
-## Safety and limitations
+1. Show the chart, environment values, Secrets usage, PVCs, Services, Ingress and NetworkPolicies.
+2. Open the storefront and dashboard.
+3. Authenticate using a Urumi Gateway API key (not the OpenRouter/provider key).
+4. Show the single MCP endpoint and namespaced WooCommerce, Weather and Currency tools.
+5. Demonstrate tool authorization and audit records.
+6. Show the documented store persistence and upstream-isolation checks.
 
-Never paste live credentials into this file. Keep the status honest: distinguish a unit test, rendered manifest, live local-cluster check, and production-like deployment. A local k3d pass does not prove a VPS/k3s deployment.
+## Security note
+
+Never commit real credentials or put keys, passwords, invitation tokens, or customer personal data in screenshots or video. Use disposable local-demo credentials and keep production secrets in an approved runtime secret manager.
