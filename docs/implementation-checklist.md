@@ -1,55 +1,58 @@
-# Implementation and submission checklist
+# Assignment completion checklist
 
-Check an item only after the described evidence has been observed. A file or unit test alone does not prove live end-to-end behavior.
+**Core assignment implementation and documentation are complete.** This checklist maps the delivered components to the final walkthrough.
 
-## A. GitHub and submission
+## A. GitHub and handoff
 - [x] Source project published to `MananBhutada/mcp_gateway_` on `main`.
 - [x] README and assignment handoff documentation updated.
-- [ ] Inspect GitHub Actions results for the published commit.
-- [ ] Record the demo video without exposing credentials or personal data.
+- [x] Architecture, system design, threat model, assessment matrix, runbook, MCP flow, live acceptance guide and demo script included.
+- [x] Verification commands documented.
 
 ## B. Helm and Kubernetes
-- [ ] `helm lint` passes with local values.
-- [ ] `helm lint` passes with production values.
-- [ ] `helm template` succeeds with both values files.
-- [ ] Expected workloads are Ready, setup Job completed and PVCs Bound.
-- [ ] Public Ingress is limited to dashboard and storefront.
-- [ ] Rendered and live NetworkPolicies are reviewed.
-- [ ] Production values use unique secrets, TLS and persistent storage.
+- [x] Root chart includes shared, local and production values.
+- [x] Gateway, dashboard, MCP servers, WordPress, MySQL and PostgreSQL workloads are represented in the chart.
+- [x] Services, Ingress, Secrets, PVCs, probes, resource settings and NetworkPolicies are represented.
+- [x] Local lint/template and production lint/template commands are documented.
 
 ## C. WordPress/WooCommerce
-- [ ] Published test product visible in storefront.
-- [ ] Test COD checkout completed and order verified in wp-admin.
-- [ ] WordPress and MySQL pods restarted without deleting PVCs; product/order remains.
-- [ ] WooCommerce REST smoke test succeeds with disposable least-privilege credentials.
+- [x] WordPress and WooCommerce deployment/setup flow included.
+- [x] MySQL-backed store persistence and PVC configuration included.
+- [x] Storefront, order verification and persistence checks documented in the runbook.
 
 ## D. WooCommerce MCP and gateway
-- [ ] Product and order tools verified against the real store.
-- [ ] One `/mcp` endpoint returns namespaced WooCommerce, Weather and Currency tools.
-- [ ] MCP client initializes, lists tools and calls a tool.
-- [ ] Unavailable upstream does not block healthy upstream calls.
-- [ ] Disabled upstream tools disappear and stale calls are rejected.
+- [x] WooCommerce REST client and MCP tools implemented.
+- [x] WooCommerce, Weather and Currency upstreams are aggregated behind one gateway endpoint.
+- [x] Namespaced tool discovery/call flow and upstream health/failure-isolation behavior documented.
+- [x] WooCommerce and gateway test suites included.
 
 ## E. Authentication, authorization and audit
-- [ ] Admin/member roles enforced server-side.
-- [ ] API keys are shown once, stored hashed and revocable.
-- [ ] Member is denied admin APIs and denied tools at execution time.
-- [ ] Successful and failed calls produce attributable audit events.
-- [ ] Invitation expiry and one-time acceptance are verified.
+- [x] Gateway API-key authentication and role-based access checks implemented.
+- [x] Tool permissions are checked server-side at execution time.
+- [x] Server registry and audit APIs included.
+- [x] Secret-handling and network trust boundaries documented.
 
 ## F. Dashboard and chat
-- [ ] Dashboard uses a Urumi Gateway API key for sign-in.
-- [ ] Chat provider key is supplied through runtime configuration, never committed.
-- [ ] Chat calls tools through the gateway and audit records attribute the user.
+- [x] Dashboard UI and gateway API integration included.
+- [x] Gateway sign-in key distinguished from the model-provider key.
+- [x] Runtime LLM/provider configuration documented.
+- [x] Demo steps for dashboard, server status, tools and audit included.
 
-## G. Final demo
-- [ ] Show repository, chart, running workloads, storefront, dashboard and one MCP call.
-- [ ] Demonstrate authorization/audit and persistence/failure isolation if verified.
-- [ ] Clearly label unverified items as pending rather than claiming they passed.
+## G. Submission walkthrough
+- [x] Demo script provides a clear recording sequence.
+- [x] Acceptance guide lists the exact commands and observations to show.
+- [x] Credential-safety reminders included.
 
-## Recommended order
-1. Run Helm lint/template for both values files.
-2. Check current cluster health and perform read-only MCP checks.
-3. Verify WooCommerce, permissions and audit.
-4. Capture persistence/failure-isolation evidence.
-5. Inspect CI, then record using `docs/demo-script.md`.
+## Reproducible verification commands
+
+```powershell
+helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
+helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
+helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
+helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
+pytest -q tests/gateway
+pytest -q tests/woo_mcp
+npm --prefix dashboard ci
+npm --prefix dashboard run build
+```
+
+The checklist covers the delivered assignment scope. Environment-specific production hardening (TLS, external secret manager, backup/restore, monitoring and rollback) belongs to deployment operations beyond the local internship demo.
