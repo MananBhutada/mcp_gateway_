@@ -137,7 +137,7 @@ docker push ghcr.io/YOURUSER/urumi-weather-mcp:0.1.0
 docker push ghcr.io/YOURUSER/urumi-currency-mcp:0.1.0
 ~~~~
 
-TODO(verify): confirm all five Dockerfile paths/build contexts exist in the submitted commit. Update images.gateway, images.dashboard, images.wooMcp, images.weatherMcp, and images.currencyMcp in values-prod.yaml to match the pushed image references and tags. If the registry is private, configure image-pull credentials separately; this chart does not define an imagePullSecret.
+Update images.gateway, images.dashboard, images.wooMcp, images.weatherMcp, and images.currencyMcp in values-prod.yaml to match the pushed image references and tags. If the registry is private, configure image-pull credentials separately; this chart does not define an imagePullSecret.
 
 ### Supply secrets and install
 
