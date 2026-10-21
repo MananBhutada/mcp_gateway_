@@ -1,12 +1,10 @@
-# Store deployment runbook (local k3d)
+# Store deployment runbook — local k3d
 
-This runbook is the next execution gate for the Urumi take-home. Passing unit tests or rendering Helm templates is **not** proof that WooCommerce, checkout, or persistence works. Record actual output and keep the acceptance checklist honest.
+This runbook is for a disposable local assignment demo. A successful Helm render or unit test does not prove checkout, persistence or production deployment.
 
-## 1. Prerequisites
+## Prerequisites
 
-Install Docker Desktop, `kubectl`, `helm` (3.16+), and `k3d`. On Windows, run commands in PowerShell from the repository root. Ensure Docker Desktop is running.
-
-Check versions:
+Install and start Docker Desktop, kubectl, Helm 3, k3d, Python 3.12 and Node.js 22. Run commands from the repository root.
 
 ```powershell
 docker version
@@ -15,7 +13,7 @@ helm version
 k3d version
 ```
 
-## 2. Validate the chart before creating a cluster
+## Validate chart first
 
 ```powershell
 helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
@@ -24,32 +22,24 @@ helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/value
 helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
 ```
 
-The CI workflow runs these same lint/render gates and asserts that the rendered output includes Deployments, Ingress, Secret resources, and all three database/content PVCs. This checks chart syntax and expected resources only; it does not install the chart.
+Inspect Secret references, PVCs, Ingress and NetworkPolicies in rendered output. Do not proceed if lint/render fails.
 
-## 3. Build and install
+## Deploy locally
 
-Use only disposable local values for a local cluster. Never copy local demo credentials into production.
+Use only disposable local values:
 
 ```powershell
 ./scripts/dev.sh
-```
-
-If PowerShell cannot run the shell script, use Git Bash or WSL. The script creates a k3d cluster if needed, builds the service images, imports them, and installs/upgrades the chart.
-
-Then inspect actual cluster state:
-
-```powershell
 kubectl get pods -o wide
 kubectl get jobs
 kubectl get pvc
 kubectl get ingress
-kubectl describe job wp-setup
 kubectl logs job/wp-setup
 ```
 
-Do not continue until MySQL and WordPress are Ready, the setup Job has completed successfully, and the MySQL, WordPress, and PostgreSQL claims are Bound. If a Job failed, inspect its logs and events before deleting or retrying it.
+If PowerShell cannot run the shell script, use Git Bash or WSL. Wait until expected pods are Ready, the setup Job is complete, and claims are Bound. Inspect logs/events before retrying failures.
 
-Add the local hostnames to the Windows hosts file as administrator:
+Add these entries to the Windows hosts file as administrator if needed:
 
 ```text
 127.0.0.1 store.urumi.local dashboard.urumi.local
@@ -57,19 +47,17 @@ Add the local hostnames to the Windows hosts file as administrator:
 
 Open `http://store.urumi.local` and `http://dashboard.urumi.local`.
 
-## 4. Prove real store behavior
+## Verify store behavior
 
-1. Confirm the Sample Tee product is published and visible in the storefront.
-2. Add it to the cart and complete checkout with Cash on Delivery using test-only customer data.
-3. Sign into `/wp-admin` and verify the order number, line items, amount, payment method and initial status.
-4. Set `WOO_BASE_URL`, `WOO_CONSUMER_KEY`, and `WOO_CONSUMER_SECRET` in the terminal, then run `python scripts/smoke_test_woocommerce.py`.
-5. Set `WOO_TEST_ORDER_ID` to a disposable test order to exercise get-order and same-status update behavior.
-6. Confirm all five WooCommerce MCP tools through the gateway, not by calling the upstream from the dashboard/client.
-7. Record the product and order IDs before restarting pods.
+1. Confirm a published demo product is visible.
+2. Add it to cart and complete checkout with Cash on Delivery using test-only details.
+3. Verify order number, line items, total, payment method and status in wp-admin.
+4. Run `python scripts/smoke_test_woocommerce.py` with disposable least-privilege REST credentials injected into the local shell.
+5. Verify the WooCommerce tools through the gateway, not by bypassing it.
 
-## 5. Prove persistence
+## Verify persistence
 
-Find the actual WordPress and MySQL pod names with `kubectl get pods`, then delete those pods (not the PVCs):
+Record a product/order ID, then restart WordPress and MySQL pods without deleting PVCs:
 
 ```powershell
 kubectl delete pod -l app=wordpress
@@ -77,25 +65,17 @@ kubectl delete pod -l app=mysql
 kubectl get pods -w
 ```
 
-After both become Ready, re-open the storefront and wp-admin. The previously recorded product and order must still exist. Never delete PVCs as part of this test.
+After the pods are Ready, verify the recorded data still exists. Never delete PVCs as part of this acceptance test.
 
-## 6. Troubleshooting guide
+## Troubleshooting
 
-- **wp-setup is Pending:** inspect pod events and PVC access mode / scheduling.
-- **wp-setup is BackOff:** inspect `kubectl logs job/wp-setup`; confirm WordPress has initialized `wp-config.php`, MySQL is ready, and the CLI container can mount the WordPress volume.
-- **Store redirects to the wrong scheme/host:** check `wordpress.scheme`, `ingress.storeHost`, and forwarded-proto handling.
-- **REST smoke test gets 401/403:** verify the WooCommerce API key has the intended permissions and that the exact consumer key/secret are injected into the Woo MCP container.
-- **REST smoke test cannot connect:** verify service DNS and that the configured base URL is reachable from inside the cluster. Do not expose MySQL or the Woo MCP publicly to work around networking.
-- **Products/orders vanish after restart:** stop and inspect PVC bindings and mount paths; do not mark persistence passed.
+- **Setup Job Pending:** inspect events, scheduling and PVC bindings.
+- **Setup Job failing:** inspect its logs, WordPress initialization and MySQL readiness.
+- **Wrong host/scheme redirect:** compare ingress host, WordPress canonical URL and forwarded-proto settings.
+- **Woo REST 401/403:** verify the key's permissions and secret injection without printing the values.
+- **Service connection errors:** check internal DNS and service names; do not expose databases/upstream MCPs publicly as a workaround.
+- **Data missing after restart:** inspect PVC bindings and mounts; mark persistence failed until corrected.
 
-## 7. Completion record
+## Completion evidence
 
-Only mark each gate complete when observed. Save:
-- Helm lint/template output
-- `kubectl get pods,jobs,pvc,ingress` output
-- wp-setup Job logs
-- storefront checkout order ID and wp-admin verification
-- REST smoke-test output (never credentials)
-- post-restart product/order verification
-
-Production-like k3s/VPS deployment is a separate gate; local k3d success does not prove production deployment.
+Save Helm lint/template output, pod/Job/PVC/Ingress output, setup Job logs, a test checkout/order verification, REST smoke-test output without secrets, and post-restart persistence proof. Local k3d success is separate from production-like k3s/VPS acceptance.
