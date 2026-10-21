@@ -12,7 +12,7 @@ secrets:
   mysqlPassword: local-wp-only
   postgresPassword: local-pg-only
   gatewaySecretKey: local-dev-secret-key-not-for-production-123456
-  bootstrapAdminKey: urumi_live_local_demo_key_do_not_reuse_123456789
+  bootstrapAdminKey: local-demo-bootstrap-key-not-for-reuse-123456789
   wpAdminPassword: local-admin-only
   wooConsumerKey: ck_local_demo_only
   wooConsumerSecret: cs_local_demo_only
