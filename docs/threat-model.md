@@ -4,7 +4,7 @@ This note describes the threats visible in the current source and Helm templates
 
 ## A. Shared upstream credentials
 
-**Threat.** A member may use a shared WooCommerce credential indirectly without ever seeing its raw value. A compromised or over-permissioned tool can exercise the upstream privileges available to that credential.
+**Threat.** A member can use a shared WooCommerce credential indirectly without ever seeing its raw value. A compromised or over-permissioned tool can exercise the upstream privileges available to that credential.
 
 **What the code does.**
 - Server credentials supplied through the gateway server-registry API are encrypted before persistence and decrypted only for server-side upstream requests. See `services/gateway/app/auth/api_keys.py` (`encrypt`/`decrypt`), `services/gateway/app/api/admin.py` (`add_server`, `patch_server`, and `_srv`), and `services/gateway/app/routing/router.py` (`refresh_server`, `execute`). The server API returns only `has_credential`, never the credential.
@@ -33,7 +33,7 @@ This note describes the threats visible in the current source and Helm templates
 
 | Threat | What the code does | Residual risk |
 |---|---|---|
-| Tool description attempts prompt injection/tool poisoning | `services/gateway/app/routing/router.py` exposes upstream descriptions to the model. `services/gateway/app/api/chat.py` uses a server-controlled system instruction that says tool outputs are untrusted and must not be used to reveal secrets. | The instruction is not a sandbox. A model may still be influenced by malicious descriptions or results. Admins must trust and review configured servers. |
+| Tool description attempts prompt injection/tool poisoning | `services/gateway/app/routing/router.py` exposes upstream descriptions to the model. `services/gateway/app/api/chat.py` uses a server-controlled system instruction that says tool outputs are untrusted and must not be used to reveal secrets. | The instruction is not a sandbox. A model can still be influenced by malicious descriptions or results. Admins must trust and review configured servers. |
 | Tool output contains injected instructions or sensitive content | Chat results are treated as untrusted data by the system instruction; tool calls still pass through `R.execute` and its authorization check. | The gateway cannot prove that arbitrary upstream content is truthful or safe. Review tool outputs and avoid granting risky tools unnecessarily. |
 | Upstream is slow or dead | `services/gateway/app/config.py` defines `UPSTREAM_TIMEOUT` (default 5 seconds) and `UPSTREAM_CALL_TIMEOUT` (default 30 seconds). `services/gateway/app/mcp/client.py` wraps each short-lived session in a timeout. `refresh_server` catches failures, removes that server's cached tools, and marks it `unreachable`; `refresh_all` isolates refresh failures across servers. | Timeouts do not prevent every resource-exhaustion pattern. Failure isolation was verified in the recorded local k3d run. |
 | Two servers register the same tool name | `services/gateway/app/routing/collisions.py` prefixes each tool as `<server>__<tool>`, for example `woocommerce__list_products` and `weather__list_products`. | Namespacing avoids same-name ambiguity but does not make a malicious tool safe. |
@@ -45,7 +45,7 @@ This note describes the threats visible in the current source and Helm templates
 
 ## D. What one team member can do to another
 
-**Threat.** A member may attempt to read another user's key, inspect their audit history, access another user's chat history, revoke their key, or impersonate their identity.
+**Threat.** A member can attempt to read another user's key, inspect their audit history, access another user's chat history, revoke their key, or impersonate their identity.
 
 **What the code does.**
 - Each API key belongs to a user, is stored as a hash, and can be marked revoked. `services/gateway/app/models/tables.py` defines `ApiKey.user_id`, `key_hash`, and `revoked`; `services/gateway/app/auth/rbac.py` rejects unknown or revoked keys.
