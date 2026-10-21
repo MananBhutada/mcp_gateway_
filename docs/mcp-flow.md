@@ -17,7 +17,7 @@
 ## Health and failure isolation
 - Health refresh updates upstream status.
 - Disabled/unreachable upstream tools should not be advertised as available.
-- Stale tool calls must be rechecked at execution time.
+- Stale tool calls are checked again at execution time.
 - One failing upstream must not block healthy upstreams.
 
 ## Security boundary
