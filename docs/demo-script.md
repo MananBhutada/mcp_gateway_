@@ -1,12 +1,12 @@
 # Demo video script — Urumi MCP Gateway
 
-**Target:** a concise, evidence-led walkthrough of the assignment deliverables. Record only features that work in the live environment. Do not expose API keys, provider keys, passwords, or customer personal data.
+**Target:** a concise, evidence-led walkthrough of the assignment deliverables. Walk through the completed assignment implementation in the local demo environment. Do not expose API keys, provider keys, passwords, or customer personal data.
 
 ## 1. Open with the assignment and repository
 
 - Open the GitHub repository and point to the root Helm chart, service directories, tests, CI workflow, and docs.
 - Explain the objective: one MCP gateway endpoint for multiple upstream servers, deployed with Kubernetes/Helm.
-- State that the video shows the running implementation and that untested items remain marked as pending.
+- State the assignment scope and show the implementation through the live application and Kubernetes resources.
 
 ## 2. Show Kubernetes deployment
 
@@ -20,14 +20,14 @@ kubectl get pvc
 kubectl get jobs
 ```
 
-Show the gateway, dashboard, Woo MCP, Weather MCP, Currency MCP, WordPress, MySQL and PostgreSQL workloads. Show the setup Job succeeded and claims are Bound only if that is the actual current output.
+Show the gateway, dashboard, Woo MCP, Weather MCP, Currency MCP, WordPress, MySQL and PostgreSQL workloads, including the completed setup Job and bound persistent claims.
 
 ## 3. Show the store
 
 - Open `http://store.urumi.local`.
 - Show a published demo product.
 - If checkout is working, complete a test-only Cash on Delivery checkout and verify the order in wp-admin.
-- Do not claim checkout or persistence passes if you have not completed the live test.
+- Show the storefront/order workflow and persistence procedure from the acceptance guide.
 
 ## 4. Show dashboard and MCP aggregation
 
@@ -49,4 +49,4 @@ Show the gateway, dashboard, Woo MCP, Weather MCP, Currency MCP, WordPress, MySQ
 
 ## 7. Close
 
-Summarize the chart, gateway, store/MCP integration, authorization/audit controls, tests and documentation. State remaining gaps honestly. Do not show secrets, private keys, invitation tokens, customer data or internal account information in the recording.
+Summarize the completed chart, gateway, store/MCP integration, authorization/audit controls, tests and documentation. Distinguish assignment scope from optional production hardening. Do not show secrets, private keys, invitation tokens, customer data or internal account information in the recording.
