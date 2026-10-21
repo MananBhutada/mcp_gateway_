@@ -37,7 +37,7 @@ kubectl get ingress
 kubectl logs job/wp-setup
 ```
 
-If PowerShell cannot run the shell script, use Git Bash or WSL. Wait until expected pods are Ready, the setup Job is complete, and claims are Bound. Inspect logs/events before retrying failures.
+If PowerShell cannot run the shell script, use Git Bash or WSL. Confirm the expected successful state: pods Ready, setup Job complete, and claims Bound. Inspect logs/events for any environment-specific startup issue.
 
 Add these entries to the Windows hosts file as administrator if needed:
 
@@ -69,7 +69,7 @@ After the pods are Ready, verify the recorded data still exists. Never delete PV
 
 ## Troubleshooting
 
-- **Setup Job Pending:** inspect events, scheduling and PVC bindings.
+- **Setup Job not complete:** inspect events, scheduling and PVC bindings, then rerun the setup after resolving the cause.
 - **Setup Job failing:** inspect its logs, WordPress initialization and MySQL readiness.
 - **Wrong host/scheme redirect:** compare ingress host, WordPress canonical URL and forwarded-proto settings.
 - **Woo REST 401/403:** verify the key's permissions and secret injection without printing the values.
