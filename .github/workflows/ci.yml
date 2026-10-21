@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "hardening/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gateway-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r services/gateway/requirements.txt
+      - run: pytest -q tests/gateway
+
+  woo-mcp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r services/woo-mcp/requirements.txt pytest
+      - run: pytest -q tests/woo_mcp
+
+  dashboard-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - working-directory: dashboard
+        run: npm ci
+      - working-directory: dashboard
+        run: npm run build
+
+  helm-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+      - name: Lint chart with local values
+        run: helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml
+      - name: Lint chart with production values
+        run: helm lint infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml
+      - name: Render local manifests
+        run: helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-local.yaml > /tmp/urumi-local.yaml
+      - name: Render production manifests
+        run: helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/values-prod.yaml > /tmp/urumi-prod.yaml
+      - name: Assert critical workloads and persistent storage render
+        shell: bash
+        run: |
+          set -euo pipefail
+          for manifest in /tmp/urumi-local.yaml /tmp/urumi-prod.yaml; do
+            for required in "kind: Deployment" "kind: PersistentVolumeClaim" "kind: Ingress" "kind: Secret"; do
+              grep -q "$required" "$manifest" || { echo "Missing rendered resource: $required in $manifest"; exit 1; }
+            done
+            grep -q "claimName: mysql-data" "$manifest"
+            grep -q "claimName: wordpress-data" "$manifest"
+            grep -q "claimName: postgres-data" "$manifest"
+          done

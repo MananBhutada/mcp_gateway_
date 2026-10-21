@@ -1,0 +1,38 @@
+images:
+  gateway: urumi/gateway:latest
+  dashboard: urumi/dashboard:latest
+  wooMcp: urumi/woo-mcp:latest
+  weatherMcp: urumi/weather-mcp:latest
+  currencyMcp: urumi/currency-mcp:latest
+  pullPolicy: IfNotPresent
+appEnv: development
+ingress:
+  className: traefik
+  storeHost: store.urumi.local
+  dashboardHost: dashboard.urumi.local
+  tlsSecret: ""
+wordpress:
+  # Use https when TLS is terminated at the Ingress in production.
+  scheme: http
+storage:
+  className: ""
+  mysql: 2Gi
+  wordpress: 2Gi
+  postgres: 1Gi
+replicas: {gateway: 1, dashboard: 1, mcp: 1}
+resources:
+  small: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
+  db: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 1000m, memory: 1Gi}}
+# Intentionally empty in shared defaults. Set unique values locally or via an external secret manager.
+secrets:
+  mysqlRootPassword: ""
+  mysqlPassword: ""
+  postgresPassword: ""
+  gatewaySecretKey: ""
+  bootstrapAdminKey: ""
+  wpAdminPassword: ""
+  wooConsumerKey: ""
+  wooConsumerSecret: ""
+  wooMcpToken: ""
+  anthropicApiKey: ""
+networkPolicies: true
