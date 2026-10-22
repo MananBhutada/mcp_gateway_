@@ -51,7 +51,8 @@ Dashboard / Gateway (/mcp, /api)
 
 Gateway control-plane data: PostgreSQL + PVC
 Credentials: Kubernetes Secrets and server-side credential handling
-```
+```<img width="2400" height="1575" alt="urumi-architecture" src="https://github.com/user-attachments/assets/7f73a208-0da1-458e-b2bd-c3ecf393372c" />
+
 
 The gateway is the client-facing trust boundary. Commerce operations use the WooCommerce REST API; the gateway does not query the store database directly. The connected upstream servers are WooCommerce (written in-house), Weather, and Currency.
 
