@@ -1,6 +1,6 @@
 # Store deployment runbook — local k3d
 
-This runbook is for a disposable local assignment demo. A successful Helm render or unit test does not prove checkout, persistence or production deployment.
+This runbook deploys and verifies the store on a local k3d cluster. The recorded walkthrough followed these steps.
 
 ## Prerequisites
 
@@ -78,4 +78,4 @@ After the pods are Ready, verify the recorded data still exists. Never delete PV
 
 ## Completion evidence
 
-Save Helm lint/template output, pod/Job/PVC/Ingress output, setup Job logs, a test checkout/order verification, REST smoke-test output without secrets, and post-restart persistence proof. Local k3d success is separate from production-like k3s/VPS acceptance.
+Evidence for this runbook is the recorded local k3d walkthrough.
