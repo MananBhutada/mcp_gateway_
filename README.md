@@ -333,5 +333,4 @@ helm template urumi infrastructure/helm/urumi -f infrastructure/helm/urumi/value
 Delivered: the root Helm chart and local/production values, WordPress + WooCommerce store, gateway, dashboard, WooCommerce/Weather/Currency upstreams, tests, and documentation. Demonstrated in the recorded local k3d run: COD checkout and persistence, chat-based product creation and order lookup, external MCP access with user B's key, cross-upstream tool use, tool permissions, upstream disable and failure isolation, key revocation, and audit attribution. The evidence record is in [Requirement-to-evidence matrix](docs/assessment-gap-matrix.md), [Implementation status](docs/STATUS.md), and [Acceptance evidence record](docs/live-acceptance-tests.md).
 
 ## Demo video
-
-<!-- DEMO_VIDEO_LINK -->
+https://drive.google.com/drive/folders/1kRacyk5BwoXWgxJG3Sg_4-HCET0bPm_k
